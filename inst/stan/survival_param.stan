@@ -590,18 +590,18 @@ if(ns_agd_regression && dist<=3) totns -= ns_agd_regression;
         // matrix crossprod(matrix x) equals to X'X
 
         agd_regression_OVB_mat_hat[i][1:agd_regression_ncoef_inc[i], 1:agd_regression_nx[i] ]  =
-        mdivide_left_spd( crossprod(X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])] ]) ,
-        (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])] ])' );
+          mdivide_left_spd( crossprod(X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])] ]) ,
+          (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])] ])' );
 
         agd_regression_OVB_mat_omt[i][1:agd_regression_ncoef_inc[i], 1:agd_regression_ncoef_omt[i] ]  =
-        agd_regression_OVB_mat_hat[i][1:agd_regression_ncoef_inc[i], 1:agd_regression_nx[i] ] *
-        (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XO_col_vec[(c_o+1):(c_o+agd_regression_ncoef_omt[i])] ]);
+          agd_regression_OVB_mat_hat[i][1:agd_regression_ncoef_inc[i], 1:agd_regression_nx[i] ] *
+          (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XO_col_vec[(c_o+1):(c_o+agd_regression_ncoef_omt[i])] ]);
 
         if(agd_regression_reduced_study[i]){ // Apply OVB for COX PH models
 
           eta_red[(c_x+1):(c_x+agd_regression_nx[i])] =
-          X_agd_regression_int[(c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])]] *
-          agd_regression_est[(c_c+1):(c_c+agd_regression_ncoef[i])];
+            X_agd_regression_int[(c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])]] *
+            agd_regression_est[(c_c+1):(c_c+agd_regression_ncoef[i])];
 
         }
 
@@ -839,15 +839,15 @@ transformed parameters {
   }
 
   // -- AgD model (regression coefficients) --
+  vector [            no_agd_regression  ? ni_agd_regression:0] eta_ful;
   vector [(dist<=3 && no_agd_regression) ? ni_agd_regression:0] lp_err; // linear predictor mismatch
-  vector [(           no_agd_regression) ? ni_agd_regression:0] mu_err; // mu mismatch
+  vector [            no_agd_regression  ? ni_agd_regression:0] mu_err; // mu mismatch
   if (nc_agd_regression) {
 
     if (sum(agd_regression_reduced_study)){
 
       real exp_eta_red_tot;
       real exp_eta_ful_tot;
-	    //real p_err_den_tot;
 
       int c_c = 0; // coef. counter
       int c_i = 0; // Included coef. counter
@@ -855,6 +855,10 @@ transformed parameters {
       int c_x = 0; // X_int rows counter
 
       for (i in 1:ns_agd_regression) {
+
+        eta_ful[(c_x+1):(c_x+agd_regression_nx[i])] =
+          X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]),] * allbeta;
+
         // OVB adjustment
         if(agd_regression_reduced_study[i]){
 
@@ -864,14 +868,12 @@ transformed parameters {
           vector [agd_regression_nx[i]] P_red; // probability of event in reduced model
           vector [agd_regression_nx[i]] exp_eta_red; // exp(eta) in full model
           vector [agd_regression_nx[i]] exp_eta_ful; // exp(eta) in reduced model
-          //vector [agd_regression_nx[i]] p_err_num;
-          //vector [agd_regression_nx[i]] p_err_den;
 
           // initial value
           mu_err[(c_x+1):(c_x+agd_regression_nx[i])] = rep_vector(0, agd_regression_nx[i] );
 
           exp_eta_red = exp(eta_red[(c_x+1):(c_x+agd_regression_nx[i])]);
-          exp_eta_ful = exp(X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]),] * allbeta);
+          exp_eta_ful = exp(eta_ful[(c_x+1):(c_x+agd_regression_nx[i])]);
 
           exp_eta_red_tot = sum(exp_eta_red);
           exp_eta_ful_tot = sum(exp_eta_ful);
@@ -881,13 +883,6 @@ transformed parameters {
 
           lp_err[(c_x+1):(c_x+agd_regression_nx[i])] =
             log(P_red ./ P_ful)  -  log(exp_eta_ful_tot / exp_eta_red_tot);
-			    // lp_err[(c_x+1):(c_x+agd_regression_nx[i])] =
-          //   eta_red[(c_x+1):(c_x+agd_regression_nx[i])] -
-          //   eta_ful[(c_x+1):(c_x+agd_regression_nx[i])];
-
-          //p_err_num = exp( (-1) * lp_err[(c_x+1):(c_x+agd_regression_nx[i])] );
-          //p_err_den = P_red .* p_err_num;
-          //p_err_den_tot = sum(p_err_den);
 
           // data sorted by event order
           for(j in 1:agd_regression_nx[i]  ) {
@@ -898,14 +893,9 @@ transformed parameters {
             mu_err[(c_x+j):(c_x+agd_regression_nx[i])] +=
               P_red[j:agd_regression_nx[i]] -
               P_ful[j:agd_regression_nx[i]] ;
-            // mu_err[(c_x+j):(c_x+agd_regression_nx[i])] +=
-            //   P_red[j:agd_regression_nx[i]] .*
-            //   ( 1 - (p_err_num[j:agd_regression_nx[i]] / p_err_den_tot) );
 
-            // Update totals
             exp_eta_red_tot -= exp_eta_red[j] ;
             exp_eta_ful_tot -= exp_eta_ful[j] ;
-            //p_err_den_tot   -= p_err_den[j] ;
 
           }
 
@@ -919,8 +909,8 @@ transformed parameters {
           }else if( dist>=4 ){ // Apply OVB for AFT models
 
             mu_err[(c_x+1):(c_x+agd_regression_nx[i])] =
-              eta_red[ (c_x+1):(c_x+agd_regression_nx[i])] -
-              (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]),] * allbeta);
+              eta_red[(c_x+1):(c_x+agd_regression_nx[i])] -
+              eta_ful[(c_x+1):(c_x+agd_regression_nx[i])];
 
             eta_agd_regression[(c_c+1):(c_c+agd_regression_ncoef[i])] =
               allbeta[XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])]] +
@@ -931,10 +921,10 @@ transformed parameters {
         }else{
           eta_agd_regression[ (c_c+1):(c_c+agd_regression_ncoef[i]) ] = X_agd_regression_no_QR[ (c_c+1):(c_c+agd_regression_ncoef[i]), ] * allbeta;
         }
-        c_x += agd_regression_nx[i];
         c_c += agd_regression_ncoef[i];
         c_i += agd_regression_ncoef_inc[i];
         c_o += agd_regression_ncoef_omt[i];
+        c_x += agd_regression_nx[i];
       }
     }else{
       eta_agd_regression = X_agd_regression * beta_tilde;

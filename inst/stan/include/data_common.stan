@@ -49,15 +49,15 @@ int<lower=0> agd_regression_max_ncoef_omt;
 int<lower=0> agd_regression_max_ncoef_inc;
 int<lower=0> agd_regression_max_nrow;
 vector[ns_agd_regression ? nc_agd_regression : 0] agd_regression_est; // Reported coef. estimations
-array[ns_agd_regression ? ns_agd_regression : 0] int<lower=0,upper=agd_regression_max_ncoef> agd_regression_ncoef; // Number of coef. in each regression model
-array[ns_agd_regression ? ns_agd_regression : 0] cholesky_factor_cov[agd_regression_max_ncoef] agd_regression_cov;
-array[ns_agd_regression ? ns_agd_regression : 0] int<lower=0,upper=1> agd_regression_reduced_study; // specify reduced study, (yes = 1)
+array[ns_agd_regression] int<lower=0,upper=agd_regression_max_ncoef> agd_regression_ncoef; // Number of coef. in each regression model
+array[ns_agd_regression] cholesky_factor_cov[agd_regression_max_ncoef] agd_regression_cov;
+array[ns_agd_regression] int<lower=0,upper=1> agd_regression_reduced_study; // specify reduced study, (yes = 1)
 array[ni_agd_regression ? nl_agd_regression : 0] int XI_col_vec; // Column numbers of included coef. in the network design matrix
 array[ni_agd_regression ? no_agd_regression : 0] int XO_col_vec; // Column numbers of omitted coef. in the netwoek design matrix
-matrix[ni_agd_regression ? ni_agd_regression : 0, ni_agd_regression ? nX : 0] X_agd_regression_int; // Design matrix using integration points
-array[ns_agd_regression ? ns_agd_regression : 0] int<lower=0> agd_regression_nx; // Number of rows for AgD regression design matrix for each study
-array[ns_agd_regression ? ns_agd_regression : 0] int<lower=0,upper=agd_regression_max_ncoef_omt> agd_regression_ncoef_omt; // Number of omitted coef. in each regression model
-array[ns_agd_regression ? ns_agd_regression : 0] int<lower=0,upper=agd_regression_max_ncoef_inc> agd_regression_ncoef_inc; // Number of included coef. in each regression model
+matrix[ni_agd_regression, ni_agd_regression ? nX : 0] X_agd_regression_int; // Design matrix using integration points
+array[ns_agd_regression] int<lower=0> agd_regression_nx; // Number of rows for AgD regression design matrix for each study
+array[ns_agd_regression] int<lower=0,upper=agd_regression_max_ncoef_omt> agd_regression_ncoef_omt; // Number of omitted coef. in each regression model
+array[ns_agd_regression] int<lower=0,upper=agd_regression_max_ncoef_inc> agd_regression_ncoef_inc; // Number of included coef. in each regression model
 
 // -- Design matrix or thin QR decomposition --
 int<lower=0, upper=1> QR; // use QR decomposition (yes = 1)

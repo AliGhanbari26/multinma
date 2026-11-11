@@ -186,9 +186,10 @@ transformed parameters {
   }
 
   // -- AgD model (regression coefficients) --
-  vector [(no_agd_regression) ? ni_agd_regression:0] mu_ful;
-  vector [(no_agd_regression) ? ni_agd_regression:0] lp_err; // linear predictor mismatch
-  vector [(no_agd_regression) ? ni_agd_regression:0] mu_err; // mu mismatch
+  vector [no_agd_regression ? ni_agd_regression:0] eta_ful;
+  vector [no_agd_regression ? ni_agd_regression:0] mu_ful;
+  vector [no_agd_regression ? ni_agd_regression:0] lp_err; // linear predictor mismatch
+  vector [no_agd_regression ? ni_agd_regression:0] mu_err; // mu mismatch
   if (nc_agd_regression) {
 
     if (sum(agd_regression_reduced_study)){
@@ -201,11 +202,14 @@ transformed parameters {
         // OVB adjustment
         if (agd_regression_reduced_study[i] ){
 
+          eta_ful[(c_x+1):(c_x+agd_regression_nx[i])] =
+            X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]),] * allbeta;
+
           if (link == 1){ // identity link
 
             mu_err[(c_x+1):(c_x+agd_regression_nx[i])] =
               eta_red[ (c_x+1):(c_x+agd_regression_nx[i])] -
-              X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]),] * allbeta;
+              eta_ful[(c_x+1):(c_x+agd_regression_nx[i])];
 
             eta_agd_regression[(c_c+1):(c_c+agd_regression_ncoef[i])] =
               allbeta[XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])]] +
@@ -215,7 +219,7 @@ transformed parameters {
           }else if (link == 2){ // log link (GLM)
 
             mu_ful[(c_x+1):(c_x+agd_regression_nx[i])] =
-              exp(X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]),] * allbeta) ;
+              exp(eta_ful[(c_x+1):(c_x+agd_regression_nx[i])]) ;
 
             mu_err[(c_x+1):(c_x+agd_regression_nx[i])] =
               mu_red[ (c_x+1):(c_x+agd_regression_nx[i])] -

@@ -331,16 +331,16 @@ if(ns_agd_regression) totns -= ns_agd_regression;
         // matrix crossprod(matrix x) equals to X'X
 
         agd_regression_OVB_mat_hat[i][1:agd_regression_ncoef_inc[i], 1:agd_regression_nx[i] ]  =
-        mdivide_left_spd( crossprod(X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])] ]) ,
-        (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])] ])' );
+          mdivide_left_spd( crossprod(X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])] ]) ,
+          (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])] ])' );
 
         agd_regression_OVB_mat_omt[i][1:agd_regression_ncoef_inc[i], 1:agd_regression_ncoef_omt[i] ]  =
-        agd_regression_OVB_mat_hat[i][1:agd_regression_ncoef_inc[i], 1:agd_regression_nx[i] ] *
-        (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XO_col_vec[(c_o+1):(c_o+agd_regression_ncoef_omt[i])] ]);
+          agd_regression_OVB_mat_hat[i][1:agd_regression_ncoef_inc[i], 1:agd_regression_nx[i] ] *
+          (X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]) ,XO_col_vec[(c_o+1):(c_o+agd_regression_ncoef_omt[i])] ]);
 
         eta_red[(c_x+1):(c_x+agd_regression_nx[i])] =
-        X_agd_regression_int[(c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])]] *
-        agd_regression_est[(c_c+1):(c_c+agd_regression_ncoef[i])];
+          X_agd_regression_int[(c_x+1):(c_x+agd_regression_nx[i]) ,XI_col_vec[(c_i+1):(c_i+agd_regression_ncoef_inc[i])]] *
+          agd_regression_est[(c_c+1):(c_c+agd_regression_ncoef[i])];
 
       }
 
@@ -611,6 +611,7 @@ transformed parameters {
   }
 
   // -- AgD model (regression coefficients) --
+  vector [no_agd_regression ? ni_agd_regression:0] eta_ful;
   vector [no_agd_regression ? ni_agd_regression:0] lp_err; // linear predictor mismatch
   vector [no_agd_regression ? ni_agd_regression:0] mu_err; // mu mismatch
   if (nc_agd_regression) {
@@ -634,11 +635,14 @@ transformed parameters {
           vector [agd_regression_nx[i]] exp_eta_red; // exp(eta) in full model
           vector [agd_regression_nx[i]] exp_eta_ful; // exp(eta) in reduced model
 
+          eta_ful[(c_x+1):(c_x+agd_regression_nx[i])] =
+            X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]),] * allbeta;
+
           // initial value
           mu_err[(c_x+1):(c_x+agd_regression_nx[i])] = rep_vector(0, agd_regression_nx[i] );
 
           exp_eta_red = exp(eta_red[(c_x+1):(c_x+agd_regression_nx[i])]);
-          exp_eta_ful = exp(X_agd_regression_int[ (c_x+1):(c_x+agd_regression_nx[i]),] * allbeta);
+          exp_eta_ful = exp(eta_ful[(c_x+1):(c_x+agd_regression_nx[i])]);
 
           exp_eta_red_tot = sum(exp_eta_red);
           exp_eta_ful_tot = sum(exp_eta_ful);
