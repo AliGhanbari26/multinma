@@ -1652,6 +1652,54 @@ nma <- function(network,
                                   classes = !is.null(network$classes),
                                   subnetwork_trt = subnetwork_trt)
 
+  # Center EM interaction columns of .trt rows in agd_regression data
+  if ( !is.null(xbar) &&
+       !is.null(X_list$X_agd_regression) &&
+       any(get_EM_vars(nma_formula) %in% names(xbar)) ){
+
+    EM_var_cen <- get_EM_vars(nma_formula)
+
+    # Locate .trt rows
+    cen_reg_trt_row <-
+      dat_agd_regression_split %>%
+      purrr::map(~ .x %>%
+                   dplyr::filter(!is.na(.estimate)) %>%
+                   dplyr::mutate( .is_trt = rowSums(across(all_of(agd_reg_var_nma))) == 0 &
+                                    !(.trt %in% .trt[.is_intercept]))
+      ) %>% dplyr::bind_rows() %>% dplyr::pull(.is_trt) %>% which()
+
+    cen_reg_trt_row %>%
+      purrr::walk(~{
+
+        cen_reg_trt_term <- c(
+          outer(EM_var_cen, paste0("\\.trt", dat_agd_regression_nonbl$.trt[.x]),paste, sep="\\:"),
+          outer(paste0("\\.trt", dat_agd_regression_nonbl$.trt[.x]), EM_var_cen,paste, sep="\\:"))
+
+        if ('.trtclass' %in% colnames(dat_agd_regression_nonbl) ){
+          cen_reg_trt_term <- c(cen_reg_trt_term,
+                                outer(EM_var_cen, paste0("\\.trtclass", dat_agd_regression_nonbl$.trtclass[.x]),paste, sep="\\:"),
+                                outer(paste0("\\.trtclass", dat_agd_regression_nonbl$.trtclass[.x]), EM_var_cen,paste, sep="\\:"))
+        }
+
+        cen_reg_trt_col <-
+          unique(
+            stringr::str_subset(
+              colnames(X_list$X_agd_regression),
+              paste0(cen_reg_trt_term, collapse = "|")
+            ))
+
+        cen_reg_cov_col <-
+          stringr::str_remove(
+            cen_reg_trt_col,
+            "^\\.trt[^:]+:|:\\.trt[^:]+$")
+
+        X_list$X_agd_regression[.x, cen_reg_trt_col] <<-
+          X_list$X_agd_regression[.x, cen_reg_trt_col, drop = FALSE] - xbar[cen_reg_cov_col]
+
+      })
+
+  }
+
   X_ipd <- X_list$X_ipd
   X_agd_arm <- X_list$X_agd_arm
   X_agd_contrast <- X_list$X_agd_contrast
