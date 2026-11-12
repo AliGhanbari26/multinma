@@ -1136,6 +1136,14 @@ nma <- function(network,
     }else{
       agd_regression_qmc_known <- rep(FALSE, ns_agd_regression)
     }
+
+    # Locate intercept and treatment rows
+    dat_agd_regression_split <- dat_agd_regression_split %>%
+      purrr::map(~ .x %>%
+                   dplyr::mutate(.is_intercept = rowSums(across(all_of(agd_reg_var_nma))) == 0 & (.trt %in% .trt[is.na(.estimate)]) & !is.na(.estimate) )) %>%
+      purrr::map(~ .x %>%
+                   dplyr::mutate( .is_trt = rowSums(across(all_of(agd_reg_var_nma))) == 0 & !(.trt %in% .trt[.is_intercept])))
+
     # Unlist dat_agd_regression
     dat_agd_regression <- dplyr::bind_rows(dat_agd_regression_split)
 
@@ -1199,8 +1207,6 @@ nma <- function(network,
     }
 
     # --- intercepts ---
-    dat_agd_regression_split <- dat_agd_regression_split %>%
-      purrr::map(~ .x %>% dplyr::mutate(.is_intercept = rowSums(across(all_of(agd_reg_var_nma))) == 0 & (.trt %in% .trt[is.na(.estimate)]) & !is.na(.estimate) ))
     agd_regression_ncoef_cpt <- dat_agd_regression_split %>% purrr::map_int(~sum(.x$.is_intercept))
     np_agd_regression <- sum(agd_regression_ncoef_cpt) # Total number of intercepts
 
@@ -1654,54 +1660,6 @@ nma <- function(network,
                                   nodesplit = nodesplit,
                                   classes = !is.null(network$classes),
                                   subnetwork_trt = subnetwork_trt)
-
-  # Center EM interaction columns of .trt rows in agd_regression data
-  if ( !is.null(xbar) &&
-       !is.null(X_list$X_agd_regression) &&
-       any(get_EM_vars(nma_formula) %in% names(xbar)) ){
-
-    EM_var_cen <- get_EM_vars(nma_formula)
-
-    # Locate .trt rows
-    cen_reg_trt_row <-
-      dat_agd_regression_split %>%
-      purrr::map(~ .x %>%
-                   dplyr::filter(!is.na(.estimate)) %>%
-                   dplyr::mutate( .is_trt = rowSums(across(all_of(agd_reg_var_nma))) == 0 &
-                                    !(.trt %in% .trt[.is_intercept]))
-      ) %>% dplyr::bind_rows() %>% dplyr::pull(.is_trt) %>% which()
-
-    cen_reg_trt_row %>%
-      purrr::walk(~{
-
-        cen_reg_trt_term <- c(
-          outer(EM_var_cen, paste0("\\.trt", dat_agd_regression_nonbl$.trt[.x]),paste, sep="\\:"),
-          outer(paste0("\\.trt", dat_agd_regression_nonbl$.trt[.x]), EM_var_cen,paste, sep="\\:"))
-
-        if ('.trtclass' %in% colnames(dat_agd_regression_nonbl) ){
-          cen_reg_trt_term <- c(cen_reg_trt_term,
-                                outer(EM_var_cen, paste0("\\.trtclass", dat_agd_regression_nonbl$.trtclass[.x]),paste, sep="\\:"),
-                                outer(paste0("\\.trtclass", dat_agd_regression_nonbl$.trtclass[.x]), EM_var_cen,paste, sep="\\:"))
-        }
-
-        cen_reg_trt_col <-
-          unique(
-            stringr::str_subset(
-              colnames(X_list$X_agd_regression),
-              paste0(cen_reg_trt_term, collapse = "|")
-            ))
-
-        cen_reg_cov_col <-
-          stringr::str_remove(
-            cen_reg_trt_col,
-            "^\\.trt[^:]+:|:\\.trt[^:]+$")
-
-        X_list$X_agd_regression[.x, cen_reg_trt_col] <<-
-          X_list$X_agd_regression[.x, cen_reg_trt_col, drop = FALSE] - xbar[cen_reg_cov_col]
-
-      })
-
-  }
 
   X_ipd <- X_list$X_ipd
   X_agd_arm <- X_list$X_agd_arm
@@ -4480,6 +4438,51 @@ make_nma_model_matrix <- function(nma_formula,
 
   } else {
     X_agd_regression <- offset_agd_regression <- NULL
+  }
+
+  # Center EM interaction columns of .trt rows in agd_regression data
+  EM_var_cen <- get_EM_vars(nma_formula)
+  if ( !is.null(xbar) &&
+       !is.null(X_agd_regression) &&
+       any(EM_var_cen %in% names(xbar)) ){
+
+    dat_agd_regression_nonbl <- dat_agd_regression[!agd_regression_bl,]
+
+    cen_trt <- dat_agd_regression %>%
+      dplyr::filter(!is.na(.estimate)) %>%
+      dplyr::pull(.is_trt) %>% which()
+
+    cen_trt %>%
+      purrr::walk(~{
+
+        cen_trt_term <- c(
+          outer(EM_var_cen, paste0("\\.trt", dat_agd_regression_nonbl$.trt[.x]),paste, sep="\\:"),
+          outer(paste0("\\.trt", dat_agd_regression_nonbl$.trt[.x]), EM_var_cen,paste, sep="\\:"))
+
+        if ('.trtclass' %in% colnames(dat_agd_regression_nonbl) ){
+          cen_trt_term <- c(cen_trt_term,
+                            outer(EM_var_cen, paste0("\\.trtclass", dat_agd_regression_nonbl$.trtclass[.x]),paste, sep="\\:"),
+                            outer(paste0("\\.trtclass", dat_agd_regression_nonbl$.trtclass[.x]), EM_var_cen,paste, sep="\\:"))
+        }
+
+        cen_trt_col <-
+          unique(
+            stringr::str_subset(
+              colnames(X_agd_regression),
+              paste0(cen_trt_term, collapse = "|")
+            ))
+
+        cen_cov_col <-
+          stringr::str_remove(
+            cen_trt_col,
+            "^\\.trt[^:]+:|:\\.trt[^:]+$")
+
+        X_agd_regression[.x, cen_trt_col] <<-
+          X_agd_regression[.x, cen_trt_col, drop = FALSE] - xbar[cen_cov_col]
+
+      })
+
+
   }
 
   return(list(X_ipd = X_ipd,
