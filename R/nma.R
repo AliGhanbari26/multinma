@@ -482,6 +482,9 @@ nma <- function(network,
     if (has_agd_contrast(network)) {
       network$agd_contrast$.trt <- network$agd_contrast$.trtclass
     }
+    if (has_agd_regression(network)) {
+      network$agd_regression$.trt <- network$agd_regression$.trtclass
+    }
 
     # Set the network treatments vector
     network$treatments <- if (.is_default(network$treatments)) {
