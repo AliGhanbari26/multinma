@@ -2616,6 +2616,14 @@ nma.fit <- function(ipd_x = NULL, ipd_y = NULL,
     # Construct array of cholesky decompositions of covariance matrices
     # agd_regression_ncoef <- purrr::map_int(agd_regression_cov, nrow)
     # agd_regression_max_ncoef <- max(agd_regression_ncoef)
+    agd_regression_trt <- apply(agd_regression_x[, col_trt, drop = FALSE], 1, get_trt)
+    if (!is.null(X_agd_regression_int)){
+      X_agd_regression_int_trt <-
+        apply(X_agd_regression_int[, col_trt, drop = FALSE], 1, get_trt)
+    } else {
+      X_agd_regression_int_trt <- numeric()
+    }
+
     agd_regression_chol <- array(NA_real_, dim = c(ns_agd_regression, agd_regression_max_ncoef, agd_regression_max_ncoef))
     for (i in 1:ns_agd_regression) {
       agd_regression_chol[i, , ] <- diag(agd_regression_max_ncoef) # pad out ragged array
@@ -2632,8 +2640,9 @@ nma.fit <- function(ipd_x = NULL, ipd_y = NULL,
     # ns_agd_regression <- 0
     # agd_regression_ncoef <- integer()
     # agd_regression_max_ncoef <- 1
-    agd_regression_chol <- array(1, dim = c(0, 1, 1))
     # agd_regression_est <- numeric()
+    agd_regression_chol <- array(1, dim = c(0, 1, 1))
+    X_agd_regression_int_trt <- agd_regression_trt <- numeric()
   }
 
   # Set up random effects
@@ -2757,7 +2766,8 @@ nma.fit <- function(ipd_x = NULL, ipd_y = NULL,
     agd_regression_ncoef_cpt = if(is.null(agd_regression_ncoef_cpt)) numeric() else as.array(agd_regression_ncoef_cpt),
     X_agd_regression_cc = if(is.null(X_agd_regression_cc)) matrix(numeric(0), nrow = 0, ncol = 0) else X_agd_regression_cc,
     agd_regression_est_map_cc = if(is.null(agd_regression_est_map_cc)) numeric() else agd_regression_est_map_cc,
-
+    agd_regression_trt = as.array(agd_regression_trt),
+    X_agd_regression_int_trt = as.array(X_agd_regression_int_trt),
     # agd_regression_arm = agd_regression_arm,
     # agd_regression_trt = agd_regression_trt,
     # narm_agd_regression = narm_agd_regression,
