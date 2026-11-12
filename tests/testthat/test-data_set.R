@@ -927,6 +927,53 @@ test_that("set_agd_regression - regression formula", {
   expect_error(set_agd_regression(s, study = study, trt = trt, estimate = est, cov = cov_list, regression = list(C = ~ x*.trt, D = ~ x*.trt)),
                '`regression` list names must match study names in `data`\\.\nNo match for names for studies "A" and "B"\\.')
 
+  # --- nested formula ---
+  s <- tibble(study = c("A", "A", "A", "A", "B", "B", "B", "B"),
+              trt = c("a", NA, "b", NA, "a", NA, "c", NA),
+              x = c(0,NA,NA, 1,0,NA,NA,NA),
+              z = c(0,NA,NA,NA,0,NA,NA, 1),
+              est = c(NA, 1, 2, 3, NA, 1, 2, 3))
+
+  AgD_reg <- set_agd_regression(s, study = study, trt = trt, estimate = est,
+                                cov = list(A = diag(3), B = diag(3)),
+                                regression = list(A = ~ z + x*.trt, B = ~ x*.trt))
+
+  expect_error(suppressWarnings(nma(AgD_reg, regression = ~ x*.trt)),
+               "AgD regression formulas must be from nested models of `regression`")
+})
+
+test_that("set_agd_regression - missed integration points", {
+
+  # --- reconstructing ---
+  s <- tibble(study = c("A", "A", "A", "A", "B", "B", "B", "B"),
+              trt = c("a", NA, "b", NA, "a", NA, "c", NA),
+              x = c(0,NA,NA, 1,0,NA,NA,NA),
+              z = c(0,NA,NA,NA,0,NA,NA, 1),
+              se = c(NA,0.1,0.1,0.1,NA,0.1,0.1, 0.1),
+              est = c(NA, 1, 2, 3, NA, 1, 2, 3))
+
+  AgD_reg <- set_agd_regression(s, study = study, trt = trt, estimate = est, se = se,
+                                # cov = list(A = diag(3), B = diag(3)),
+                                regression = list(A = ~ z + x*.trt, B = ~ x*.trt))
+
+  expect_error(suppressWarnings(nma(AgD_reg, regression = ~ z+x*.trt, likelihood = "normal", OVB_adj = "all")),
+               'Integration points are not provided to reconstruct the covariance matrix of the coefficients for studies "A" and "B".\nFor each study, provide `se` and integration points with `add_integration()`, or provide `se` and `cor`, or `cov`.', fixed = TRUE)
+
+  # --- reduced models ---
+  s <- tibble(study = c("A", "A", "A", "A", "B", "B", "B", "B"),
+              trt = c("a", NA, "b", NA, "a", NA, "c", NA),
+              x = c(0,NA,NA, 1,0,NA,NA,NA),
+              z = c(0,NA,NA,NA,0,NA,NA, 1),
+              se = c(NA,0.1,0.1,0.1,NA,0.1,0.1, 0.1),
+              est = c(NA, 1, 2, 3, NA, 1, 2, 3))
+
+  AgD_reg <- set_agd_regression(s, study = study, trt = trt, estimate = est, se = se,
+                                cov = list(A = diag(3), B = diag(3)),
+                                regression = list(A = ~ z + x*.trt, B = ~ x*.trt))
+
+  expect_error(suppressWarnings(nma(AgD_reg, regression = ~ z+x*.trt, likelihood = "normal", OVB_adj = "all")),
+               'OVB_adj = "all", but no integration points are provided for study "B"\nUse add_integration(), or set OVB_adj = "auto" or "none".', fixed = TRUE)
+
 })
 
 test_that("set_agd_regression - estimate", {
@@ -1215,6 +1262,21 @@ test_that("set_agd_regression - intercept", {
                              cor=diag(2))
   expect_error(nma(AgD_reg, regression = ~ x1 + x2, likelihood = "ordered", OVB_adj = 'all', prior_intercept = normal(location = 0, scale = 100), prior_trt = normal(location = 0, scale = 10), prior_reg = normal(location = 0, scale = 10), prior_aux = flat()), m)
 
+  # X_agd_regression_cc matrix
+  s$ord_cut <- c(NA,'1|2',NA,NA,NA,'3|4','1|2',NA,NA)
+  AgD_reg <- set_agd_regression(s, study = study, trt = trt, estimate = est, regression = ~ x1,
+                                cov = list(A = diag(3), B = diag(4)),
+                                covariates = data.frame(study = c("A", "B"), x1_mean = 1, x1_sd = 1, x2_mean = 1, x2_sd = 1),
+                                ordinal_cut = 'ord_cut',
+                                ordinal_cut_lab = c('1|2','2|3','3|4')
+  )
+  AgD_reg <- add_integration(AgD_reg,
+                             x1 = distr(qnorm,mean=1,sd=1),
+                             x2 = distr(qnorm,mean=1,sd=1),
+                             cor=diag(2))
+  expect_equal(
+    nma(AgD_reg, debug = TRUE, regression = ~ x1 + x2, likelihood = "ordered", OVB_adj = 'all', prior_intercept = normal(location = 0, scale = 100), prior_trt = normal(location = 0, scale = 10), prior_reg = normal(location = 0, scale = 10), prior_aux = flat())$X_agd_regression_cc %>% c(),
+    c(1,0,0,0,1,0,0, 0,0,0,0,0,0,0, 0,0,0,1,0,0,0))
 
 })
 
