@@ -11,6 +11,13 @@
 #' @param E column of `data` specifying the total time at risk for Poisson
 #'   outcomes
 #' @template args-data_Surv
+#' @param allow_single_arm Should single-arm studies be allowed? If `"warn"`
+#' a warning is given when single-arm studies are present. If `"error"` or
+#' `FALSE`, an error is given when single-arm studies are present. If `TRUE` or
+#' `"inform"`, an informative note is given. The default is `"warn"`, except for
+#' survival data for which the default is `TRUE` to allow convenient prediction
+#' for external
+#' data sources. Can be set globally via option `multinma.allow_single_arm`.
 #'
 #' @return An object of class [nma_data]
 #' @export
@@ -51,13 +58,15 @@ set_ipd <- function(data,
                     r = NULL, E = NULL,
                     Surv = NULL,
                     trt_ref = NULL,
-                    trt_class = NULL) {
+                    trt_class = NULL,
+                    allow_single_arm) {
 
   # Check data is data frame
   if (!inherits(data, "data.frame")) abort("Argument `data` should be a data frame")
   if (nrow(data) == 0) {
     return(make_nma_data())
   }
+
 
   # Pull study and treatment columns
   if (missing(study)) abort("Specify `study`")
@@ -130,6 +139,14 @@ set_ipd <- function(data,
                              r = .r, n = NULL, E = .E,
                              Surv = .Surv)
 
+  if (missing(allow_single_arm)) {
+    allow_single_arm <- getOption("multinma.allow_single_arm",
+                                  if (o_type == "survival") TRUE else "warn")
+  }
+  if (!rlang::is_bool(allow_single_arm)) {
+    rlang::arg_match(allow_single_arm, c("warn", "error", "inform", "TRUE", "FALSE"))
+  }
+
   # Check for single-arm studies
   single_arm_studies <- tibble::tibble(.study, .trt) %>%
     dplyr::distinct(.data$.study, .data$.trt) %>%
@@ -138,11 +155,14 @@ set_ipd <- function(data,
     dplyr::pull(.data$.study)
 
   if (length(single_arm_studies)) {
-    if (o_type == "survival") {
+    if (allow_single_arm == "inform" || isTRUE(allow_single_arm)) {
       inform(glue::glue("Single-arm stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} present in the network: ",
                         glue::glue_collapse(glue::double_quote(as.character(single_arm_studies)), sep = ", ", last = " and "), "."))
-    } else {
-      abort(glue::glue("Single-arm studies are not supported: issue with stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} ",
+    } else if (allow_single_arm == "warn") {
+      warn(glue::glue("Single-arm stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} present in the network: ",
+                      glue::glue_collapse(glue::double_quote(as.character(single_arm_studies)), sep = ", ", last = " and "), "."))
+    } else if (allow_single_arm == "error" || isFALSE(allow_single_arm)) {
+      abort(glue::glue("Single-arm studies detected: issue with stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} ",
                        glue::glue_collapse(glue::double_quote(single_arm_studies), sep = ", ", last = " and "), "."))
     }
   }
@@ -249,7 +269,11 @@ set_ipd <- function(data,
 #' @param n column of `data` specifying Binomial outcome numerator
 #' @param sample_size column of `data` giving the sample size in each arm.
 #'   Optional, see details.
-#'
+#' @param allow_single_arm Should single-arm studies be allowed? If `"warn"`
+#'   (the default) a warning is given when single-arm studies are present. If
+#'   `"error"` or `FALSE`, an error is given when single-arm studies are
+#'   present. If `TRUE` or `"inform"` an informative note is given. The default
+#'   can be set globally via option `multinma.allow_single_arm`.
 #' @return An object of class [nma_data]
 #' @export
 
@@ -279,7 +303,8 @@ set_agd_arm <- function(data,
                         r = NULL, n = NULL, E = NULL,
                         sample_size = NULL,
                         trt_ref = NULL,
-                        trt_class = NULL) {
+                        trt_class = NULL,
+                        allow_single_arm) {
 
   # Check data is data frame
   if (!inherits(data, "data.frame")) abort("Argument `data` should be a data frame")
@@ -312,6 +337,13 @@ set_agd_arm <- function(data,
     trt_original_levels <- NULL
   }
 
+  if (missing(allow_single_arm)) {
+    allow_single_arm <- getOption("multinma.allow_single_arm", "warn")
+  }
+  if (!rlang::is_bool(allow_single_arm)) {
+    rlang::arg_match(allow_single_arm, c("warn", "error", "inform", "TRUE", "FALSE"))
+  }
+
   # Check for single-arm studies
   single_arm_studies <- tibble::tibble(.study, .trt) %>%
     dplyr::group_by(.data$.study) %>%
@@ -319,8 +351,16 @@ set_agd_arm <- function(data,
     dplyr::pull(.data$.study)
 
   if (length(single_arm_studies)) {
-    abort(glue::glue("Single-arm studies are not supported: issue with stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} ",
-                     glue::glue_collapse(glue::double_quote(single_arm_studies), sep = ", ", last = " and "), "."))
+    if (allow_single_arm == "inform" || isTRUE(allow_single_arm)) {
+      inform(glue::glue("Single-arm stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} present in the network: ",
+                        glue::glue_collapse(glue::double_quote(as.character(single_arm_studies)), sep = ", ", last = " and "), "."))
+    } else if (allow_single_arm == "warn") {
+      warn(glue::glue("Single-arm stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} present in the network: ",
+                      glue::glue_collapse(glue::double_quote(as.character(single_arm_studies)), sep = ", ", last = " and "), "."))
+    } else if (allow_single_arm == "error" || isFALSE(allow_single_arm)) {
+      abort(glue::glue("Single-arm studies detected: issue with stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} ",
+                       glue::glue_collapse(glue::double_quote(single_arm_studies), sep = ", ", last = " and "), "."))
+    }
   }
 
   # Treatment classes
@@ -729,7 +769,12 @@ set_agd_contrast <- function(data,
 #' @param covariates data frame of covariate summary statistics for each study
 #'   or study arm, with corresponding `study` and `trt` columns to match to
 #'   those in `data`
-#'
+#' @param allow_single_arm Should single-arm studies be allowed? If `"warn"` a
+#'   warning is given when single-arm studies are present. If `"error"` or
+#'   `FALSE`, an error is given when single-arm studies are present. If `TRUE`
+#'   or `"inform"`, an informative note is given. The default for survival data
+#'   is `TRUE`, to allow convenient prediction for external data sources. Can be
+#'   set globally via option `multinma.allow_single_arm`.
 #' @return An object of class [nma_data]
 #' @export
 #'
@@ -758,7 +803,8 @@ set_agd_surv <- function(data,
                          Surv,
                          covariates = NULL,
                          trt_ref = NULL,
-                         trt_class = NULL) {
+                         trt_class = NULL,
+                         allow_single_arm) {
 
   # Check data is data frame
   if (!inherits(data, "data.frame")) abort("Argument `data` should be a data frame")
@@ -795,6 +841,13 @@ set_agd_surv <- function(data,
     trt_original_levels <- NULL
   }
 
+  if (missing(allow_single_arm)) {
+    allow_single_arm <- getOption("multinma.allow_single_arm", TRUE)
+  }
+  if (!rlang::is_bool(allow_single_arm)) {
+    rlang::arg_match(allow_single_arm, c("warn", "error", "inform", "TRUE", "FALSE"))
+  }
+
   # Check for single-arm studies
   single_arm_studies <- tibble::tibble(.study, .trt) %>%
     dplyr::distinct(.data$.study, .data$.trt) %>%
@@ -803,8 +856,16 @@ set_agd_surv <- function(data,
     dplyr::pull(.data$.study)
 
   if (length(single_arm_studies)) {
-    inform(glue::glue("Single-arm stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} present in the network: ",
+    if (allow_single_arm == "inform" || isTRUE(allow_single_arm)) {
+      inform(glue::glue("Single-arm stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} present in the network: ",
+                        glue::glue_collapse(glue::double_quote(as.character(single_arm_studies)), sep = ", ", last = " and "), "."))
+    } else if (allow_single_arm == "warn") {
+      warn(glue::glue("Single-arm stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} present in the network: ",
                       glue::glue_collapse(glue::double_quote(as.character(single_arm_studies)), sep = ", ", last = " and "), "."))
+    } else if (allow_single_arm == "error" || isFALSE(allow_single_arm)) {
+      abort(glue::glue("Single-arm studies detected: issue with stud{if (length(single_arm_studies) > 1) 'ies' else 'y'} ",
+                       glue::glue_collapse(glue::double_quote(single_arm_studies), sep = ", ", last = " and "), "."))
+    }
   }
 
   # Treatment classes
@@ -1514,6 +1575,10 @@ set_agd_regression <- function(data,
 #' @param ... multiple data sources, as defined using the `set_*` functions
 #' @param trt_ref reference treatment for the entire network, as a string (or
 #'   coerced as such) referring to the levels of the treatment factor variable
+#' @param allow_mixed_studies Logical scalar (default `FALSE`), whether to
+#'   allow the same study label to appear in more than one data source. By
+#'   default, studies with the same label found in multiple data sources will
+#'   produce an error.
 #'
 #' @return An object of class [nma_data]
 #' @export
@@ -1555,7 +1620,7 @@ set_agd_regression <- function(data,
 #'
 #' # Plot network
 #' plot(pso_net, weight_nodes = TRUE, weight_edges = TRUE, show_trt_class = TRUE)
-combine_network <- function(..., trt_ref) {
+combine_network <- function(..., trt_ref, allow_mixed_studies = FALSE) {
   s <- list(...)
 
   # Check that arguments all inherit from nma_data class
@@ -1627,9 +1692,11 @@ combine_network <- function(..., trt_ref) {
 
   # Check that no studies are duplicated between data sources
   all_studs <- purrr::flatten_chr(purrr::map(s, ~levels(.$studies)))
-  if (anyDuplicated(all_studs)) {
-    abort(sprintf("Studies with same label found in multiple data sources: %s",
-                  paste0(unique(all_studs[duplicated(all_studs)]), collapse = ", ")))
+  if (allow_mixed_studies == FALSE) {
+    if (anyDuplicated(all_studs)) {
+      abort(sprintf("Studies with same label found in multiple data sources: %s",
+                    paste0(unique(all_studs[duplicated(all_studs)]), collapse = ", ")))
+    }
   }
 
   # Combine study code factor
